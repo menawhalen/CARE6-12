@@ -8,42 +8,48 @@
 #
 
 library(shiny)
+library(tidyverse)
+
+dat <- read_csv("4-11dat.csv", skip = 8)
+### how to clean this
+## think of other things
+names(dat) <- c("id", "session", "date", "longitude", "latitude", "temp", "pm1", "pm10", "pm2_5", "humidity")
+dat <- dat %>% 
+  mutate(date = ymd_hms(date))
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
-
-    # Application title
-    titlePanel("Old Faithful Geyser Data"),
-
-    # Sidebar with a slider input for number of bins 
-    sidebarLayout(
-        sidebarPanel(
-            sliderInput("bins",
-                        "Number of bins:",
-                        min = 1,
-                        max = 50,
-                        value = 30)
-        ),
-
+    ## slider for picking time aggregation
+    sliderInput(
+        "time_agg",
+        "Set Temporal Aggregation Value (Seconds)",
+        min = 1,
+        max = 60,
+        value = 3,
+        step = 1
+      ),
         # Show a plot of the generated distribution
         mainPanel(
            plotOutput("distPlot")
         )
     )
-)
+
 
 # Define server logic required to draw a histogram
 server <- function(input, output) {
-
+  
+    time_averaged <- reactive({
+    
+      dat %>% 
+        group_by(agg = floor_date(date, unit = paste(as.character(input$time_agg), " seconds"))) %>% 
+        summarise(ave_pm2_5 = mean(pm2_5, na.rm = T))
+      })
     output$distPlot <- renderPlot({
-        # generate bins based on input$bins from ui.R
-        x    <- faithful[, 2]
-        bins <- seq(min(x), max(x), length.out = input$bins + 1)
-
-        # draw the histogram with the specified number of bins
-        hist(x, breaks = bins, col = 'darkgray', border = 'white',
-             xlab = 'Waiting time to next eruption (in mins)',
-             main = 'Histogram of waiting times')
+        ## time series plot
+      ggplot(time_averaged(), aes(agg, ave_pm2_5)) +
+        geom_line() +
+        labs(x = "Datetime",
+             y = "Average PM2.5")
     })
 }
 
