@@ -14,6 +14,7 @@ library(bslib)
 # Load and clean data
 dat <- read_csv("4-11dat.csv", skip = 8)
 names(dat) <- c("id", "session", "date", "longitude", "latitude", "temp", "pm1", "pm10", "pm2_5", "humidity")
+
 dat <- dat %>% 
   mutate(date = ymd_hms(date))
 
@@ -25,10 +26,10 @@ my_theme <- bs_theme(
                      accent = "#A7F7BE",
                      primary = "#AA44AA",
                      base_font = "sans-serif",
-                     bootswatch = "yeti",
-                     rounded = TRUE,
-              "card-border-radius" = "1rem"       # specifically for cards and value_box()
-                     )
+                     bootswatch = "pulse")#,
+                     #rounded = TRUE)
+              #"card-border-radius" = "1rem"       # specifically for cards and value_box()
+                     #)
 #bs_theme_preview(my_theme)
 
 # Define UI for application that draws a histogram
@@ -56,7 +57,7 @@ ui <- page_navbar(
       ),
       bslib::value_box(
         title = "Standard Deviation of PM2.5 Levels", value = round(sd(dat$pm2_5,na.rm = TRUE), digits = 2),
-        theme = "primary", showcase = fontawesome::fa_i("hand-holding-dollar"),
+        theme = "primary", showcase = fontawesome::fa_i("plus-minus"),
         showcase_layout = "top right", full_screen = FALSE, fill = TRUE,
         height = NULL,
         card_wrapper =TRUE
@@ -87,19 +88,40 @@ ui <- page_navbar(
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
   
-    time_averaged <- reactive({
-    
-      dat %>% 
-        group_by(agg = floor_date(date, unit = paste(as.character(input$time_agg), " seconds"))) %>% 
-        summarise(ave_pm2_5 = mean(pm2_5, na.rm = T))
-      })
-    output$distPlot <- renderPlot({
-        ## time series plot
-      ggplot(time_averaged(), aes(agg, ave_pm2_5)) +
-        geom_line() +
-        labs(x = "Datetime",
-             y = "Average PM2.5")
-    })
+  time_averaged <- reactive({
+    dat %>%
+      pivot_longer(
+        cols = c(pm1, pm10, pm2_5),
+        names_to = "pm_size",
+        values_to = "value") %>%
+      group_by(
+        agg = lubridate::floor_date(date, unit = paste(input$time_agg, "seconds")),
+        pm_size) %>%
+      summarise(
+        avg_pm = mean(value, na.rm = TRUE),
+        .groups = "drop")
+  })
+  output$distPlot <- renderPlot({
+    ggplot(time_averaged(), aes(x = agg, y = avg_pm, color = pm_size)) +
+      geom_line(size = 1) +
+      scale_color_manual(
+        values = c(
+          "pm1" = "#AA44AA",
+          "pm2_5" = "#A7F7BE",
+          "pm10" = "#08B2E3")
+      ) +
+      labs(
+        x = "Datetime",
+        y = "Averaged PM",
+        title = "PM2.5 Levels Charted and Averaged Over Time",
+        color = "Particle Size") +
+      theme_minimal() +
+      theme(
+        panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank()
+      )
+  })
+  
 }
 
 # Run the application 
