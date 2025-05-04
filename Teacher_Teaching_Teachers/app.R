@@ -83,7 +83,7 @@ ui <- page_navbar(
     ## Temporal Aggregation Value (Seconds)
     radioButtons("time_agg", label = h3("Select Temporal Aggregation Value (s)"),
                  choices = list("10s" = 10, "30s" = 20, "60s" = 60), 
-                 selected = 3),
+                 selected = 60),
     plotOutput("distPlot")
   ),
   
@@ -139,7 +139,7 @@ server <- function(input, output, session) {
       labs(
         x = "Datetime",
         y = "Averaged PM",
-        title = "PM2.5 Levels Charted and Averaged Over Time",
+        title = "Averaged PM Levels by Size Over Time",
         color = "Particle Size") +
       theme_minimal() +
       theme(
