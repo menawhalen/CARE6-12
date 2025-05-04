@@ -1,6 +1,6 @@
 # Authors: Mena & Alyssa
 # Last Updated: 4/25/2025
-# Intended Use: Create a dashboard for students to upload and visualize 
+# Intended Use: Create a dashboard for students/teachers to upload and visualize 
 # PurpleAir data
 ############################################################################
 
@@ -10,13 +10,33 @@ library(tidyverse)
 library(sf)
 library(lubridate)
 library(bslib)
+library(leaflet)
 
 # Load and clean data
 dat <- read_csv("4-11dat.csv", skip = 8)
-names(dat) <- c("id", "session", "date", "longitude", "latitude", "temp", "pm1", "pm10", "pm2_5", "humidity")
+names(dat) <- c("id", "session", "date", "latitude","longitude", "temp", "pm1", "pm10", "pm2_5", "humidity")
 
 dat <- dat %>% 
   mutate(date = ymd_hms(date))
+
+# Load Chicago community areas
+chi_map <- st_read("Chicago_Community_Areas/chi_comm_areas.shp")
+
+# Create SF object of sensors
+sensor_dat <- dat %>%
+  select(session, longitude, latitude) %>%
+  filter(!duplicated(session)) %>%
+  st_as_sf(
+    coords = c("longitude", "latitude"),
+    crs = st_crs(chi_map)) %>%
+    st_transform(st_crs(chi_map))
+
+# Merge map geeometry with sf object sensor data 
+chi_map_sensor <- st_join(
+  x = chi_map,
+  y = sensor_dat,
+  join = st_intersects)
+
 
 ## Define theme for dashboard
 # Create a custom theme
@@ -26,10 +46,7 @@ my_theme <- bs_theme(
                      accent = "#A7F7BE",
                      primary = "#AA44AA",
                      base_font = "sans-serif",
-                     bootswatch = "pulse")#,
-                     #rounded = TRUE)
-              #"card-border-radius" = "1rem"       # specifically for cards and value_box()
-                     #)
+                     bootswatch = "pulse")
 #bs_theme_preview(my_theme)
 
 # Define UI for application that draws a histogram
@@ -71,6 +88,12 @@ ui <- page_navbar(
   ),
   
   nav_panel(
+    "Map",
+    h3("Sensors in Chicago"),
+    leafletOutput("mapPlot", height = 600)
+  ),
+  
+  nav_panel(
     "Upload",
     h3("Upload Sensor Data"),
     p("This page will be used to upload data.")
@@ -87,7 +110,8 @@ ui <- page_navbar(
 
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
-  
+ 
+  # Create reactive expression for aggregated pm values on line chart 
   time_averaged <- reactive({
     dat %>%
       pivot_longer(
@@ -95,12 +119,14 @@ server <- function(input, output, session) {
         names_to = "pm_size",
         values_to = "value") %>%
       group_by(
-        agg = lubridate::floor_date(date, unit = paste(input$time_agg, "seconds")),
+        agg = floor_date(date, unit = paste(input$time_agg, "seconds")),
         pm_size) %>%
       summarise(
         avg_pm = mean(value, na.rm = TRUE),
         .groups = "drop")
   })
+  
+  # Render line chart of aggregated pm values across time
   output$distPlot <- renderPlot({
     ggplot(time_averaged(), aes(x = agg, y = avg_pm, color = pm_size)) +
       geom_line(size = 1) +
@@ -122,6 +148,23 @@ server <- function(input, output, session) {
       )
   })
   
+  # Render Map with Sensors plotted
+  output$mapPlot <- renderLeaflet({
+    leaflet() %>%
+      addProviderTiles("CartoDB.Positron") %>%
+      addPolygons(
+        data = chi_map,
+        color = "black",         
+        weight = 1,              
+        fillOpacity = 0.2
+      ) %>%
+      addCircleMarkers(
+        data = sensor_dat,
+        radius = 7,
+        color = "#AA44AA",
+        popup = ~session
+      )
+  })
 }
 
 # Run the application 
