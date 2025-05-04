@@ -1,5 +1,6 @@
 # Authors: Mena & Alyssa
-# Last Updated: 4/25/2025
+# Created: 4/25/2025
+# Last Updated: 5/4/2025
 # Intended Use: Create a dashboard for students/teachers to upload and visualize 
 # PurpleAir data
 ############################################################################
@@ -29,9 +30,11 @@ sensor_dat <- dat %>%
   st_as_sf(
     coords = c("longitude", "latitude"),
     crs = st_crs(chi_map)) %>%
-    st_transform(st_crs(chi_map))
+    st_transform(crs = 4326)
 
-# Merge map geeometry with sf object sensor data 
+
+# Merge map geeometry with sf object sensor data
+chi_map <- st_transform(chi_map, crs = 4326)
 chi_map_sensor <- st_join(
   x = chi_map,
   y = sensor_dat,
