@@ -100,14 +100,14 @@ ui <- page_navbar(
   nav_panel(
     "Upload",
     h3("Upload Sensor Data"),
-    p("This page will be used to upload data."),
+    p("This page will be used to upload data. Please upload AirBeam csv files downloaded from www.aircasting.habitatmap.org. Multple files can be uploaded together."),
     fileInput("file1", "Choose CSV File", accept = ".csv", multiple = TRUE)
   ),
 
   nav_panel(
     "About",
     h3("About this Dashboard"),
-    p("This is a student dashboard using a custom Bootstrap theme!")
+    p("This dashboard is for CARE 6-12 to work with local teachers to educate on environmental justice and air quality impacts in Chicago. This dashboard was created by Nora Lee, Mena Whalen and Alyssa Peer in partnership with the Loyola Center for Data Science and Consulting!")
   )
 
  )
