@@ -14,7 +14,7 @@ library(bslib)
 library(leaflet)
 
 # Load and clean data
-dat <- read_csv("4-11dat.csv", skip = 8)
+dat <- read_csv("walking.csv", skip = 8)
 names(dat) <- c("id", "session", "date", "latitude","longitude", "temp", "pm1", "pm10", "pm2_5", "humidity")
 
 dat <- dat %>% 
@@ -63,24 +63,25 @@ ui <- page_navbar(
     h2("Welcome to the Dashboard"),
     layout_columns(
       bslib::value_box(
-        title = "Total Number of Sensors", value = n_distinct(dat$session), theme = "info",
-        showcase = fontawesome::fa_i("hashtag"), showcase_layout = "top right",
-        full_screen = FALSE, fill = TRUE, height = NULL,
-        card_wrapper =TRUE
+        title = "Total Number of Sensors",
+        value = textOutput("totalSensorsText"),
+        theme = "info",
+        showcase = fontawesome::fa_i("hashtag"),
+        showcase_layout = "top right"
       ),
       bslib::value_box(
-        title = "Average PM2.5 Levels", value = round(mean(dat$pm2_5,na.rm = TRUE), digits = 2),
-        theme = "secondary", showcase = fontawesome::fa_i("smog"),
-        showcase_layout = "top right", full_screen = FALSE, fill = TRUE,
-        height = NULL,
-        card_wrapper =TRUE
+        title = "Average PM2.5 Levels",
+        value = textOutput("avgPM25Text"),
+        theme = "secondary",
+        showcase = fontawesome::fa_i("smog"),
+        showcase_layout = "top right"
       ),
       bslib::value_box(
-        title = "Standard Deviation of PM2.5 Levels", value = round(sd(dat$pm2_5,na.rm = TRUE), digits = 2),
-        theme = "primary", showcase = fontawesome::fa_i("plus-minus"),
-        showcase_layout = "top right", full_screen = FALSE, fill = TRUE,
-        height = NULL,
-        card_wrapper =TRUE
+        title = "Standard Deviation of PM2.5 Levels",
+        value = textOutput("sdPM25Text"),
+        theme = "primary",
+        showcase = fontawesome::fa_i("plus-minus"),
+        showcase_layout = "top right"
       )
     ),
     ## Temporal Aggregation Value (Seconds)
@@ -99,7 +100,8 @@ ui <- page_navbar(
   nav_panel(
     "Upload",
     h3("Upload Sensor Data"),
-    p("This page will be used to upload data.")
+    p("This page will be used to upload data."),
+    fileInput("file1", "Choose CSV File", accept = ".csv")
   ),
 
   nav_panel(
@@ -113,22 +115,59 @@ ui <- page_navbar(
 
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
- 
+ ## Adding Data
+  data_to_use <- reactive({
+    if (is.null(input$file1)) {
+      dat
+    } else {
+      new_data <- read.csv(input$file1$datapath, header = TRUE)
+      names(new_data) <- c("id", "session", "date", "latitude","longitude", "temp", "pm1", "pm10", "pm2_5", "humidity")
+      new_data <- new_data %>%
+        mutate(date = ymd_hms(date))
+      new_data
+    }
+  })
   # Create reactive expression for aggregated pm values on line chart 
   time_averaged <- reactive({
-    dat %>%
+    data_to_use() %>%
       pivot_longer(
         cols = c(pm1, pm10, pm2_5),
         names_to = "pm_size",
-        values_to = "value") %>%
+        values_to = "value"
+      ) %>%
       group_by(
         agg = floor_date(date, unit = paste(input$time_agg, "seconds")),
-        pm_size) %>%
+        pm_size
+      ) %>%
       summarise(
         avg_pm = mean(value, na.rm = TRUE),
-        .groups = "drop")
+        .groups = "drop"
+      )
+  })
+  ## sensor map reactive
+  
+  sensor_dat_reactive <- reactive({
+    data_to_use() %>%
+      select(session, longitude, latitude) %>%
+      filter(!duplicated(session)) %>%
+      st_as_sf(
+        coords = c("longitude", "latitude"),
+        crs = st_crs(chi_map)
+      ) %>%
+      st_transform(crs = 4326)
   })
   
+  output$totalSensorsText <- renderText({
+    n_distinct(data_to_use()$session)
+  })
+  
+  output$avgPM25Text <- renderText({
+    round(mean(data_to_use()$pm2_5, na.rm = TRUE), 2)
+  })
+  
+  output$sdPM25Text <- renderText({
+    round(sd(data_to_use()$pm2_5, na.rm = TRUE), 2)
+  })
   # Render line chart of aggregated pm values across time
   output$distPlot <- renderPlot({
     ggplot(time_averaged(), aes(x = agg, y = avg_pm, color = pm_size)) +
@@ -157,17 +196,18 @@ server <- function(input, output, session) {
       addProviderTiles("CartoDB.Positron") %>%
       addPolygons(
         data = chi_map,
-        color = "black",         
-        weight = 1,              
+        color = "black",
+        weight = 1,
         fillOpacity = 0.2
       ) %>%
       addCircleMarkers(
-        data = sensor_dat,
+        data = sensor_dat_reactive(),
         radius = 7,
         color = "#AA44AA",
         popup = ~session
       )
   })
+  
 }
 
 # Run the application 
