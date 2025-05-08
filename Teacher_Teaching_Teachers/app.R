@@ -101,7 +101,7 @@ ui <- page_navbar(
     "Upload",
     h3("Upload Sensor Data"),
     p("This page will be used to upload data."),
-    fileInput("file1", "Choose CSV File", accept = ".csv")
+    fileInput("file1", "Choose CSV File", accept = ".csv", multiple = TRUE)
   ),
 
   nav_panel(
@@ -120,11 +120,30 @@ server <- function(input, output, session) {
     if (is.null(input$file1)) {
       dat
     } else {
-      new_data <- read_csv(input$file1$datapath, skip = 8)
-      names(new_data) <- c("id", "session", "date", "latitude","longitude", "temp", "pm1", "pm10", "pm2_5", "humidity")
-      new_data <- new_data %>%
-        mutate(date = ymd_hms(date))
-      new_data
+      # Loop over each file
+      all_data <- purrr::map_dfr(input$file1$datapath, ~ {
+        # Read each CSV (adjust if you need different skips etc.)
+        df <- readr::read_csv(.x, skip = 8)
+        
+        # Standardize column names
+        names(df) <- c("id", "session", "date", "latitude", "longitude",
+                       "temp", "pm1", "pm10", "pm2_5", "humidity")
+        
+        # Format date
+        df <- df %>% mutate(date = lubridate::ymd_hms(date))
+        
+        df
+      })
+      
+      # Optional: you can add a check to stop if a file doesn't match expected cols
+      expected_cols <- c("id", "session", "date", "latitude", "longitude",
+                         "temp", "pm1", "pm10", "pm2_5", "humidity")
+      if (!all(expected_cols %in% names(all_data))) {
+        shiny::showNotification("Error: One or more files do not have the expected format.", type = "error")
+        return(NULL)
+      }
+      
+      all_data
     }
   })
   # Create reactive expression for aggregated pm values on line chart 
@@ -137,7 +156,8 @@ server <- function(input, output, session) {
       ) %>%
       group_by(
         agg = floor_date(date, unit = paste(input$time_agg, "seconds")),
-        pm_size
+        pm_size,
+        session
       ) %>%
       summarise(
         avg_pm = mean(value, na.rm = TRUE),
@@ -183,6 +203,7 @@ server <- function(input, output, session) {
         y = "Averaged PM",
         title = "Averaged PM Levels by Size Over Time",
         color = "Particle Size") +
+      facet_wrap(~session, scales = "free", ncol = 1) +
       theme_minimal() +
       theme(
         panel.grid.minor.x = element_blank(),
