@@ -120,7 +120,7 @@ server <- function(input, output, session) {
     if (is.null(input$file1)) {
       dat
     } else {
-      new_data <- read.csv(input$file1$datapath, header = TRUE)
+      new_data <- read_csv(input$file1$datapath, skip = 8)
       names(new_data) <- c("id", "session", "date", "latitude","longitude", "temp", "pm1", "pm10", "pm2_5", "humidity")
       new_data <- new_data %>%
         mutate(date = ymd_hms(date))
