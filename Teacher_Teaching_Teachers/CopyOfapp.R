@@ -13,50 +13,28 @@ library(lubridate)
 library(bslib)
 library(leaflet)
 
-# Load and clean data
+# Load and clean initial default data
 dat <- read_csv("walking.csv", skip = 8)
 names(dat) <- c("id", "session", "date", "latitude","longitude", "temp", "pm1", "pm10", "pm2_5", "humidity")
-
-dat <- dat %>% 
-  mutate(date = ymd_hms(date))
+dat <- dat %>% mutate(date = ymd_hms(date))
 
 # Load Chicago community areas
 chi_map <- st_read("Chicago_Community_Areas/chi_comm_areas.shp")
 
-# Create SF object of sensors
-sensor_dat <- dat %>%
-  select(session, longitude, latitude) %>%
-  filter(!duplicated(session)) %>%
-  st_as_sf(
-    coords = c("longitude", "latitude"),
-    crs = st_crs(chi_map)) %>%
-    st_transform(crs = 4326)
-
-
-# Merge map geeometry with sf object sensor data
-chi_map <- st_transform(chi_map, crs = 4326)
-chi_map_sensor <- st_join(
-  x = chi_map,
-  y = sensor_dat,
-  join = st_intersects)
-
-
-## Define theme for dashboard
 # Create a custom theme
 my_theme <- bs_theme(
-                    bg = "#F7F7F7",
-                     fg = "#AA44AA",
-                     accent = "#A7F7BE",
-                     primary = "#AA44AA",
-                     base_font = "sans-serif",
-                     bootswatch = "pulse")
-#bs_theme_preview(my_theme)
+  bg = "#F7F7F7",
+  fg = "#AA44AA",
+  accent = "#A7F7BE",
+  primary = "#AA44AA",
+  base_font = "sans-serif",
+  bootswatch = "pulse"
+)
 
-# Define UI for application that draws a histogram
 ui <- page_navbar(
   theme = my_theme,
   title = "CARE Teacher Dashboard",
-  nav_spacer(), # push nav items to the right
+  nav_spacer(),
   
   nav_panel(
     "Home",
@@ -84,9 +62,8 @@ ui <- page_navbar(
         showcase_layout = "top right"
       )
     ),
-    ## Temporal Aggregation Value (Seconds)
     radioButtons("time_agg", label = h3("Select Temporal Aggregation Value (s)"),
-                 choices = list("10s" = 10, "30s" = 20, "60s" = 60), 
+                 choices = list("10s" = 10, "30s" = 30, "60s" = 60), 
                  selected = 60),
     plotOutput("distPlot")
   ),
@@ -101,53 +78,54 @@ ui <- page_navbar(
     "Upload",
     h3("Upload Sensor Data"),
     p("This page will be used to upload data."),
-    fileInput("file1", "Choose CSV File", accept = ".csv", multiple = TRUE)
+    fileInput("file1", "Choose CSV File", accept = ".csv", multiple = TRUE),
+    actionButton("process_btn", "Load Data")
   ),
-
+  
   nav_panel(
     "About",
     h3("About this Dashboard"),
     p("This is a student dashboard using a custom Bootstrap theme!")
   )
+)
 
- )
-
-
-# Define server logic required to draw a histogram
 server <- function(input, output, session) {
- ## Adding Data
-  data_to_use <- reactive({
-    if (is.null(input$file1)) {
-      dat
-    } else {
-      # Loop over each file
-      all_data <- purrr::map_dfr(input$file1$datapath, ~ {
-        # Read each CSV (adjust if you need different skips etc.)
-        df <- readr::read_csv(.x, skip = 8)
-        
-        # Standardize column names
-        names(df) <- c("id", "session", "date", "latitude", "longitude",
-                       "temp", "pm1", "pm10", "pm2_5", "humidity")
-        
-        # Format date
-        df <- df %>% mutate(date = lubridate::ymd_hms(date))
-        
-        df
-      })
-      
-      # Optional: you can add a check to stop if a file doesn't match expected cols
-      expected_cols <- c("id", "session", "date", "latitude", "longitude",
-                         "temp", "pm1", "pm10", "pm2_5", "humidity")
-      if (!all(expected_cols %in% names(all_data))) {
-        shiny::showNotification("Error: One or more files do not have the expected format.", type = "error")
-        return(NULL)
-      }
-      
-      all_data
-    }
+  # --- NEW: Track uploaded files separately ---
+  uploaded_files <- reactiveVal(NULL)
+  
+  observeEvent(input$file1, {
+    uploaded_files(input$file1)
   })
-  # Create reactive expression for aggregated pm values on line chart 
+  
+  # --- NEW: Only process data on button click ---
+  data_to_use <- eventReactive(input$process_btn, {
+    files <- uploaded_files()
+    
+    if (is.null(files)) {
+      return(dat)
+    }
+    
+    all_data <- purrr::map_dfr(files$datapath, ~ {
+      df <- readr::read_csv(.x, skip = 8)
+      names(df) <- c("id", "session", "date", "latitude", "longitude",
+                     "temp", "pm1", "pm10", "pm2_5", "humidity")
+      df %>% mutate(date = lubridate::ymd_hms(date))
+    })
+    
+    expected_cols <- c("id", "session", "date", "latitude", "longitude",
+                       "temp", "pm1", "pm10", "pm2_5", "humidity")
+    
+    if (!all(expected_cols %in% names(all_data))) {
+      showNotification("Error: One or more files do not have the expected format.", type = "error")
+      return(NULL)
+    }
+    
+    all_data
+  })
+  
+  # Reactive for averaged time series
   time_averaged <- reactive({
+    req(data_to_use())
     data_to_use() %>%
       pivot_longer(
         cols = c(pm1, pm10, pm2_5),
@@ -164,9 +142,10 @@ server <- function(input, output, session) {
         .groups = "drop"
       )
   })
-  ## sensor map reactive
   
+  # Sensor data as sf for map
   sensor_dat_reactive <- reactive({
+    req(data_to_use())
     data_to_use() %>%
       select(session, longitude, latitude) %>%
       filter(!duplicated(session)) %>%
@@ -178,18 +157,22 @@ server <- function(input, output, session) {
   })
   
   output$totalSensorsText <- renderText({
+    req(data_to_use())
     n_distinct(data_to_use()$session)
   })
   
   output$avgPM25Text <- renderText({
+    req(data_to_use())
     round(mean(data_to_use()$pm2_5, na.rm = TRUE), 2)
   })
   
   output$sdPM25Text <- renderText({
+    req(data_to_use())
     round(sd(data_to_use()$pm2_5, na.rm = TRUE), 2)
   })
-  # Render line chart of aggregated pm values across time
+  
   output$distPlot <- renderPlot({
+    req(time_averaged())
     ggplot(time_averaged(), aes(x = agg, y = avg_pm, color = pm_size)) +
       geom_line(size = 1) +
       scale_color_manual(
@@ -211,8 +194,8 @@ server <- function(input, output, session) {
       )
   })
   
-  # Render Map with Sensors plotted
   output$mapPlot <- renderLeaflet({
+    req(sensor_dat_reactive())
     leaflet() %>%
       addProviderTiles("CartoDB.Positron") %>%
       addPolygons(
@@ -228,8 +211,6 @@ server <- function(input, output, session) {
         popup = ~session
       )
   })
-  
 }
 
-# Run the application 
 shinyApp(ui = ui, server = server)
