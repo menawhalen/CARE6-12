@@ -24,9 +24,11 @@ chi_map <- st_read("Chicago_Community_Areas/chi_comm_areas.shp")
 # Create a custom theme
 my_theme <- bs_theme(
   bg = "#F7F7F7",
-  fg = "#AA44AA",
-  accent = "#A7F7BE",
-  primary = "#AA44AA",
+  fg = "#5a0722",
+  accent = "#888888",
+  primary = "#eaaa00",
+  light = "#f9e6b3",
+  info = "#f2cc66",
   base_font = "sans-serif",
   bootswatch = "pulse"
 )
@@ -43,14 +45,14 @@ ui <- page_navbar(
       bslib::value_box(
         title = "Total Number of Sensors",
         value = textOutput("totalSensorsText"),
-        theme = "info",
+        theme = "light",
         showcase = fontawesome::fa_i("hashtag"),
         showcase_layout = "top right"
       ),
       bslib::value_box(
         title = "Average PM2.5 Levels",
         value = textOutput("avgPM25Text"),
-        theme = "secondary",
+        theme = "info",
         showcase = fontawesome::fa_i("smog"),
         showcase_layout = "top right"
       ),
@@ -177,9 +179,9 @@ server <- function(input, output, session) {
       geom_line(size = 1) +
       scale_color_manual(
         values = c(
-          "pm1" = "#AA44AA",
-          "pm2_5" = "#A7F7BE",
-          "pm10" = "#08B2E3")
+          "pm1" = "#5a0722",
+          "pm2_5" = "#eaaa00",
+          "pm10" = "#888888")
       ) +
       labs(
         x = "Datetime",
@@ -207,7 +209,7 @@ server <- function(input, output, session) {
       addCircleMarkers(
         data = sensor_dat_reactive(),
         radius = 7,
-        color = "#AA44AA",
+        color = "#eaaa00",
         popup = ~session
       )
   })
