@@ -24,11 +24,12 @@ chi_map <- st_read("Chicago_Community_Areas/chi_comm_areas.shp")
 # Create a custom theme
 my_theme <- bs_theme(
   bg = "#F7F7F7",
-  fg = "#5a0722",
-  accent = "#888888",
-  primary = "#eaaa00",
-  light = "#f9e6b3",
-  info = "#f2cc66",
+  fg = "#eaaa00",
+  accent = "#000000",
+  primary = "#5a0722",
+  danger = "#5a0722",
+  light = "#3f0518",
+  info = "#7b394e",
   base_font = "sans-serif",
   bootswatch = "pulse"
 )
@@ -40,7 +41,7 @@ ui <- page_navbar(
   
   nav_panel(
     "Home",
-    h2("Welcome to the Dashboard"),
+    h2("Welcome to the Dashboard", style = "color: #888888;"),
     layout_columns(
       bslib::value_box(
         title = "Total Number of Sensors",
@@ -52,19 +53,19 @@ ui <- page_navbar(
       bslib::value_box(
         title = "Average PM2.5 Levels",
         value = textOutput("avgPM25Text"),
-        theme = "info",
+        theme = "danger",
         showcase = fontawesome::fa_i("smog"),
         showcase_layout = "top right"
       ),
       bslib::value_box(
         title = "Standard Deviation of PM2.5 Levels",
         value = textOutput("sdPM25Text"),
-        theme = "primary",
+        theme = "info",
         showcase = fontawesome::fa_i("plus-minus"),
         showcase_layout = "top right"
       )
     ),
-    radioButtons("time_agg", label = h3("Select Temporal Aggregation Value (s)"),
+    radioButtons("time_agg", label = h3("Select Temporal Aggregation Value (s)",style = "color: #888888;"),
                  choices = list("10s" = 10, "30s" = 30, "60s" = 60), 
                  selected = 60),
     plotOutput("distPlot")
@@ -72,15 +73,15 @@ ui <- page_navbar(
   
   nav_panel(
     "Map",
-    h3("Sensors in Chicago"),
+    h3("Sensors in Chicago", style = "color: #888888;"),
     leafletOutput("mapPlot", height = 600)
   ),
   
   nav_panel(
     "Upload",
-    h3("Upload Sensor Data"),
-    p("This page will be used to upload data."),
-    fileInput("file1", "Choose CSV File", accept = ".csv", multiple = TRUE),
+    h3("Upload Sensor Data", style = "color: #888888;"),
+    p("This page will be used to upload data.", style = "color: #888888;"),
+    fileInput("file1", "Choose CSV File",accept = ".csv", multiple = TRUE),
     actionButton("process_btn", "Load Data")
   ),
   
@@ -179,8 +180,8 @@ server <- function(input, output, session) {
       geom_line(size = 1) +
       scale_color_manual(
         values = c(
-          "pm1" = "#5a0722",
-          "pm2_5" = "#eaaa00",
+          "pm1" = "#eaaa00",
+          "pm2_5" = "#5a0722",
           "pm10" = "#888888")
       ) +
       labs(
