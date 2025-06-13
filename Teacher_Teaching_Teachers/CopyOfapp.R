@@ -87,8 +87,8 @@ ui <- page_navbar(
   
   nav_panel(
     "About",
-    h3("About this Dashboard"),
-    p("This is a student dashboard using a custom Bootstrap theme!")
+    h3("About this Dashboard",style = "color: #888888;"),
+    p("This is a student dashboard using a custom Bootstrap theme!",style = "color: #888888;")
   )
 )
 
