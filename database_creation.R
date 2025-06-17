@@ -13,9 +13,9 @@ library(lubridate)
 
 con <- dbConnect(RSQLite::SQLite(), "C:/Users/noral/OneDrive/Desktop/CDSC/care6-12/CARE6-12/care612Database.db")
 
-# dat1 <- read_csv("data/1.csv", skip = 8)
-# names(dat1) <- c("id", "session", "date", "latitude","longitude", "temp", "pm1", "pm10", "pm2_5", "humidity")
-# dat1 <- dat1 %>% mutate(date = ymd_hms(date))
+dat1 <- read_csv("data/1.csv", skip = 8)
+names(dat1) <- c("id", "session", "date", "latitude","longitude", "temp", "pm1", "pm10", "pm2_5", "humidity")
+dat1 <- dat1 %>% mutate(date = ymd_hms(date))
 
 
 
