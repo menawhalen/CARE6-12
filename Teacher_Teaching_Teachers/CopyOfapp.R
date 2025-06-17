@@ -12,6 +12,7 @@ library(sf)
 library(lubridate)
 library(bslib)
 library(leaflet)
+library(plotly)
 
 # Load and clean initial default data
 dat <- read_csv("walking.csv", skip = 8)
@@ -68,7 +69,7 @@ ui <- page_navbar(
     radioButtons("time_agg", label = h3("Select Temporal Aggregation Value (s)",style = "color: #888888;"),
                  choices = list("10s" = 10, "30s" = 30, "60s" = 60), 
                  selected = 60),
-    plotOutput("distPlot")
+    plotly::plotlyOutput("distPlot")
   ),
   
   nav_panel(
@@ -88,8 +89,15 @@ ui <- page_navbar(
   nav_panel(
     "About",
     h3("About this Dashboard",style = "color: #888888;"),
-    p("This is a student dashboard using a custom Bootstrap theme!",style = "color: #888888;")
-  )
+    p("This is a student dashboard using a custom Bootstrap theme!",style = "color: #888888;"),
+    
+    tags$a(
+      href = "https://youtu.be/mNeYoTAaIlA",
+      "Watch the explanatory video on YouTube",
+      target = "_blank",
+      style = "color: #0056b3; font-weight: bold; display: block; margin-top: 20px;"
+    )
+)
 )
 
 server <- function(input, output, session) {
@@ -166,15 +174,17 @@ server <- function(input, output, session) {
   
   output$avgPM25Text <- renderText({
     req(data_to_use())
-    round(mean(data_to_use()$pm2_5, na.rm = TRUE), 2)
+    avg <- round(mean(data_to_use()$pm2_5, na.rm = TRUE), 2)
+    paste0(avg, " µg/m³")
   })
   
   output$sdPM25Text <- renderText({
     req(data_to_use())
-    round(sd(data_to_use()$pm2_5, na.rm = TRUE), 2)
+    sd <- round(sd(data_to_use()$pm2_5, na.rm = TRUE), 2)
+    paste0(sd, " µg/m³")
   })
   
-  output$distPlot <- renderPlot({
+  output$distPlot <- plotly::renderPlotly({
     req(time_averaged())
     ggplot(time_averaged(), aes(x = agg, y = avg_pm, color = pm_size)) +
       geom_line(size = 1) +
