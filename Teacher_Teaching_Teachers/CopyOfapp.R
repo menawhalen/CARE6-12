@@ -73,6 +73,16 @@ ui <- page_navbar(
   ),
   
   nav_panel(
+    "Box Plots",
+    h3("PM Distribution by Type", style = "color: #888888;"),
+    fluidRow(
+      column(4, plotOutput("boxPlot_pm1")),
+      column(4, plotOutput("boxPlot_pm2_5")),
+      column(4, plotOutput("boxPlot_pm10"))
+    )
+  ),
+  
+  nav_panel(
     "Map",
     h3("Sensors in Chicago", style = "color: #888888;"),
     leafletOutput("mapPlot", height = 600)
@@ -223,6 +233,30 @@ server <- function(input, output, session) {
         color = "#eaaa00",
         popup = ~session
       )
+  })
+
+  output$boxPlot_pm1 <- renderPlot({
+    req(data_to_use())
+    boxplot(data_to_use()$pm1,
+            main = "PM1",
+            ylab = "µg/m³",
+            col = "#eaaa00")
+  })
+  
+  output$boxPlot_pm2_5 <- renderPlot({
+    req(data_to_use())
+    boxplot(data_to_use()$pm2_5,
+            main = "PM2.5",
+            ylab = "µg/m³",
+            col = "#5a0722")
+  })
+  
+  output$boxPlot_pm10 <- renderPlot({
+    req(data_to_use())
+    boxplot(data_to_use()$pm10,
+            main = "PM10",
+            ylab = "µg/m³",
+            col = "#888888")
   })
 }
 
